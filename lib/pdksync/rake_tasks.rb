@@ -26,6 +26,11 @@ namespace :pdksync do
     PdkSync.main(steps: [:run_a_command], args: args[:command])
   end
 
+  desc "Multi Gem Testing'"
+  task :multi_gem_testing, [:version_file, :build_gem, :gem_path, :gemfury_user_name] do |_task, args|
+    PdkSync.main(steps: [:multi_gem_testing], args: args)
+  end
+
   desc 'Display the current configuration of pdksync'
   task :show_config do
     include PdkSync::Constants
@@ -49,6 +54,11 @@ namespace :git do
   desc 'Clone managed modules'
   task :clone_managed_modules do
     PdkSync.main(steps: [:clone])
+  end
+
+  desc 'Clone managed modules'
+  task :clone_managed_gem do
+    PdkSync.main(steps: [:clone_gem])
   end
 
   desc "Stage commits for modules, branchname and commit message eg rake 'git:create_commit[flippity, commit messagez]'"

@@ -11,9 +11,11 @@ module PdkSync # rubocop:disable Style/ClassAndModuleChildren
     default_config = {
       namespace: 'puppetlabs',
       pdksync_dir: 'modules_pdksync',
+      pdksync_gem_dir: 'gem_pdksync',
       push_file_destination: 'origin',
       create_pr_against: 'master',
       managed_modules: 'managed_modules.yml',
+      managed_gems: 'managed_gems.yml',
       pdksync_label: 'maintenance',
       git_platform: :github,
       git_base_uri: 'https://github.com',
@@ -31,9 +33,11 @@ module PdkSync # rubocop:disable Style/ClassAndModuleChildren
       custom_config = YAML.load_file(config_path)
       config[:namespace] = custom_config['namespace'] ||= default_config[:namespace]
       config[:pdksync_dir] = custom_config['pdksync_dir'] ||= default_config[:pdksync_dir]
+      config[:pdksync_gem_dir] = custom_config['pdksync_gem_dir'] ||= default_config[:pdksync_gem_dir]
       config[:push_file_destination] = custom_config['push_file_destination'] ||= default_config[:push_file_destination]
       config[:create_pr_against] = custom_config['create_pr_against'] ||= default_config[:create_pr_against]
       config[:managed_modules] = custom_config['managed_modules'] ||= default_config[:managed_modules]
+      config[:managed_gems] = custom_config['managed_gems'] ||= default_config[:managed_gems]
       config[:pdksync_label] = custom_config['pdksync_label'] ||= default_config[:pdksync_label]
       config[:git_platform] = custom_config['git_platform'] ||= default_config[:git_platform]
       config[:git_base_uri] = custom_config['git_base_uri'] ||= case config[:git_platform]
@@ -49,9 +53,11 @@ module PdkSync # rubocop:disable Style/ClassAndModuleChildren
 
     NAMESPACE = config[:namespace].freeze
     PDKSYNC_DIR = config[:pdksync_dir].freeze
+    PDKSYNC_GEM_DIR = config[:pdksync_dir].freeze
     PUSH_FILE_DESTINATION = config[:push_file_destination].freeze
     CREATE_PR_AGAINST = config[:create_pr_against].freeze
     MANAGED_MODULES = config[:managed_modules].freeze
+    MANAGED_GEMS = config[:managed_gems].freeze
     PDKSYNC_LABEL = config[:pdksync_label].freeze
     GIT_PLATFORM = config[:git_platform].downcase.to_sym.freeze
     GIT_BASE_URI = config[:git_base_uri].freeze
@@ -62,7 +68,7 @@ module PdkSync # rubocop:disable Style/ClassAndModuleChildren
                    when :gitlab
                      ENV['GITLAB_TOKEN'].freeze
                    end
-
+    GEMFURY_TOKEN = ENV['GEMFURY_TOKEN'].freeze
     # Sanity checks
 
     unless supported_git_platforms.include?(GIT_PLATFORM)
@@ -73,6 +79,11 @@ module PdkSync # rubocop:disable Style/ClassAndModuleChildren
     if ACCESS_TOKEN.nil?
       raise "Git platform access token for #{GIT_PLATFORM.capitalize} not set"\
         " - use 'export #{GIT_PLATFORM.upcase}_TOKEN=\"<your token>\"' to set"
+    end
+
+    if GEMFURY_TOKEN.nil?
+      raise "Gemfury access token not set"\
+        " - use 'export GEMFURY_TOKEN=\"<your token>\"' to set"
     end
   end
 end

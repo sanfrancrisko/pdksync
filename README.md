@@ -3,14 +3,24 @@
 Table of Contents
 -----------------
 
-1. [Overview](#overview)
-2. [Requirements](#requirements)
-3. [Usage](#usage)
-4. [How it works](#how-it-works)
-5. [Configuration](#configuration)
-6. [Workflow](#workflow)
-7. [Migrating from modulesync to pdksync](#migrating-from-modulesync-to-pdksync)
-8. [Contributing](#contributing)
+- [Pdksync](#Pdksync)
+  - [Table of Contents](#Table-of-Contents)
+  - [### Overview](#Overview)
+  - [### Requirements](#Requirements)
+  - [### Usage](#Usage)
+  - [### How it works](#How-it-works)
+    - [Configuration](#Configuration)
+      - [Git platform support](#Git-platform-support)
+        - [GitHub](#GitHub)
+        - [GitLab](#GitLab)
+  - [### Workflow](#Workflow)
+  - [### Managed modules](#Managed-modules)
+  - [### Migrating from modulesync to pdksync](#Migrating-from-modulesync-to-pdksync)
+      - [Terminology](#Terminology)
+        - [Prerequisites](#Prerequisites)
+        - [Getting started](#Getting-started)
+  - [### Compatibility](#Compatibility)
+  - [### Contributing](#Contributing)
 
 ### Overview
 --------
@@ -100,6 +110,27 @@ The rake tasks take in a file, `managed_modules.yml`, stored within the local di
 
 By default, pdksync will supply a label to a PR (default is 'maintenance'). This can be changed by creating `pdksync.yml` in the local directory and setting the `pdksync_label` key. You must ensure that the label selected exists on the modules that you are applying pdksync to. Should you wish to disable this feature, set `pdksync_label` to an empty string i.e. `''`. Similarly, when supplying a label using the `git:create_pr` rake task, the label must exist on each of the managed modules to run successfully.
 
+pdksync tool is extended with the new feature to perform multi gem testing.(`puppet-module-gems`)This functionality will identify the current version and bump the version by one.Then it will build and push the gems to gemfury account.Export the GEMFURY_TOKEN to use this rake task.
+
+ ```shell
+   export GEMFURY_TOKEN=<access_token>
+   ```
+
+Update the gem in the below file
+managed_gems.yml:
+```yaml
+---
+- gemrepo
+```
+
+Run the following commands to check that everything is working as expected:
+
+```shell
+bundle install --path .bundle/gems/
+bundle exec rake -T
+bundle exec rake git:clone_managed_gems
+```
+
 The following rake tasks are available with pdksync:
 - `pdksync:show_config` Display the current configuration of pdksync
 - `git:clone_managed_modules` Clone managed modules.
@@ -113,6 +144,8 @@ The following rake tasks are available with pdksync:
   - `rake pdksync` PR title outputs as `pdksync - pdksync_heads/master-0-gabccfb1`
   - `rake 'pdksync[MODULES-8231]'` PR title outputs as `pdksync - MODULES-8231 - pdksync_heads/master-0-gabccfb1`
 - `pdksync:run_a_command[:command]` Run a command against modules eg rake 'pdksync:run_a_command[complex command here -f -gx]'
+- `pdksync:multi_gem_testing[]` Push new gems built to the gemfury account for testing eg rake 'pdksync:multi_gem_testing[]'
+
 
 ### Configuration
 

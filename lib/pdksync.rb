@@ -11,6 +11,8 @@ require 'yaml'
 require 'colorize'
 require 'bundler'
 require 'octokit'
+require 'pry'
+require 'rubygems/version.rb'
 
 # @summary
 #   This module set's out and controls the pdksync process
@@ -38,9 +40,11 @@ module PdkSync
   include Constants
   @namespace = Constants::NAMESPACE
   @pdksync_dir = Constants::PDKSYNC_DIR
+  @pdksync_gem_dir = Constants::PDKSYNC_GEM_DIR
   @push_file_destination = Constants::PUSH_FILE_DESTINATION
   @create_pr_against = Constants::CREATE_PR_AGAINST
   @managed_modules = Constants::MANAGED_MODULES
+  @managed_gems = Constants::MANAGED_GEMS
   @default_pdksync_label = Constants::PDKSYNC_LABEL
   @git_platform = Constants::GIT_PLATFORM
   @git_base_uri = Constants::GIT_BASE_URI
@@ -48,14 +52,26 @@ module PdkSync
     access_token: Constants::ACCESS_TOKEN,
     gitlab_api_endpoint: Constants::GITLAB_API_ENDPOINT
   }
+  @gemfury_token = Constants::GEMFURY_TOKEN
 
   def self.main(steps: [:clone], args: nil)
     check_pdk_version
     create_filespace
     client = setup_client
     module_names = return_modules
-    raise "No modules found in '#{@managed_modules}'" if module_names.nil?
+    gem_names = return_gems
+    # The current directory is saved for cleanup purposes
+    main_path = Dir.pwd
+    
+    if module_names.nil?
+      puts "(WARNING) No modules found in #{@managed_modules}".red
+    end
+    if gem_names.nil?
+      puts "(WARNING) No gems found in '#{@managed_gems}'".red
+    end
+    if module_names.nil? == false
     validate_modules_exist(client, module_names)
+    validate_gems_exist(client, gem_names)
     pr_list = []
 
     # The current directory is saved for cleanup purposes
@@ -82,114 +98,180 @@ module PdkSync
       puts "Removing branch_name =#{args[:branch_name]}"
     end
 
-    abort "No modules listed in #{@managed_modules}" if module_names.nil?
-    module_names.each do |module_name|
-      module_args = args.clone
-      Dir.chdir(main_path) unless Dir.pwd == main_path
-      print "#{module_name}, "
-      repo_name = "#{@namespace}/#{module_name}"
-      output_path = "#{@pdksync_dir}/#{module_name}"
-      if steps.include?(:clone)
-        clean_env(output_path) if Dir.exist?(output_path)
-        print 'delete module directory, '
-        @git_repo = clone_directory(@namespace, module_name, output_path)
-        print 'cloned, '
-        puts "(WARNING) Unable to clone repo for #{module_name}".red if @git_repo.nil?
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        next if @git_repo.nil?
-      end
-      puts '(WARNING) @output_path does not exist, skipping module'.red unless File.directory?(output_path)
-      next unless File.directory?(output_path)
-      if steps.include?(:pdk_convert)
-        exit_status = run_command(output_path, "#{return_pdk_path} convert --force --template-url https://github.com/puppetlabs/pdk-templates")
-        print 'converted, '
-        next unless exit_status.zero?
-      end
-      if steps.include?(:pdk_validate)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        exit_status = run_command(output_path, "#{return_pdk_path} validate -a")
-        print 'validated, '
-        next unless exit_status.zero?
-      end
-      if steps.include?(:run_a_command)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        print 'run command, '
-        exit_status = run_command(output_path, module_args)
-        next unless exit_status.zero?
-      end
-      if steps.include?(:pdk_update)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        next unless pdk_update(output_path).zero?
-        if steps.include?(:use_pdk_ref)
-          ref = return_template_ref
-          pr_title = module_args[:additional_title] ? "#{module_args[:additional_title]} - pdksync_#{ref}" : "pdksync_#{ref}"
-          module_args = module_args.merge(branch_name: "pdksync_#{ref}",
-                                          commit_message: pr_title,
-                                          pr_title: pr_title,
-                                          pdksync_label: @default_pdksync_label)
-        end
-        print 'pdk update, '
-      end
-      if steps.include?(:create_commit)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        git_instance = Git.open(output_path)
-        create_commit(git_instance, module_args[:branch_name], module_args[:commit_message])
-        print 'commit created, '
-      end
-      if steps.include?(:push)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        git_instance = Git.open(output_path)
-        if git_instance.diff(git_instance.current_branch, "#{@push_file_destination}/#{@create_pr_against}").size != 0 # Git::Diff doesn't have empty? # rubocop:disable Style/ZeroLengthPredicate
-          push_staged_files(git_instance, git_instance.current_branch, repo_name)
-          print 'push, '
-        else
-          print 'skipped push, '
-        end
-      end
-      if steps.include?(:create_pr)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        git_instance = Git.open(output_path)
-        if git_instance.diff(git_instance.current_branch, "#{@push_file_destination}/#{@create_pr_against}").size != 0 # Git::Diff doesn't have empty? # rubocop:disable Style/ZeroLengthPredicate
-          pdk_version = return_pdk_version("#{output_path}/metadata.json")
-
-          # If a label is supplied, verify that it is available in the repo
-          label = module_args[:pdksync_label] ? module_args[:pdksync_label] : module_args[:label]
-          label_valid = (label.is_a?(String) && !label.to_str.empty?) ? check_for_label(client, repo_name, label) : nil
-
-          # Exit current iteration if an error occured retrieving a label
-          if label_valid == false
-            raise 'Ensure label is valid'
-          end
-
-          # Create the PR and add link to pr list
-          pr = create_pr(client, repo_name, git_instance.current_branch, pdk_version, module_args[:pr_title])
-          if pr.nil?
-            break
-          end
-
-          pr_list.push(pr.html_url)
-          print 'created pr, '
-
-          # If a valid label is supplied, add this to the PR
-          if label_valid == true
-            add_label(client, repo_name, pr.number, label)
-            print "added label '#{label}' "
-          end
-        else
-          print 'skipped pr, '
-        end
-      end
-      if steps.include?(:clean_branches)
-        Dir.chdir(main_path) unless Dir.pwd == main_path
-        delete_branch(client, repo_name, module_args[:branch_name])
-        print 'branch deleted, '
-      end
-      puts 'done.'.green
+    # validation run_a_command
+    if steps.include?(:multi_gem_testing)
+      raise '"multi_gem_testing" requires arguments to run version_file and build_gem.' if args.nil? || args[:version_file].nil? || args[:build_gem].nil?
+      puts "Command '#{args}'"
     end
+
+    if module_names.nil? == false
+      module_names.each do |module_name|
+        module_args = args.clone
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        print "#{module_name}, "
+        repo_name = "#{@namespace}/#{module_name}"
+        output_path = "#{@pdksync_dir}/#{module_name}"
+        if steps.include?(:clone)
+          clean_env(output_path) if Dir.exist?(output_path)
+          print 'delete module directory, '
+          @git_repo = clone_directory(@namespace, module_name, output_path)
+          print 'cloned, '
+          puts "(WARNING) Unable to clone repo for #{module_name}".red if @git_repo.nil?
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          next if @git_repo.nil?
+        end
+        puts '(WARNING) @output_path does not exist, skipping module'.red unless File.directory?(output_path)
+        next unless File.directory?(output_path)
+        if steps.include?(:pdk_convert)
+          exit_status = run_command(output_path, "#{return_pdk_path} convert --force --template-url https://github.com/puppetlabs/pdk-templates")
+          print 'converted, '
+          next unless exit_status.zero?
+        end
+        if steps.include?(:pdk_validate)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          exit_status = run_command(output_path, "#{return_pdk_path} validate -a")
+          print 'validated, '
+          next unless exit_status.zero?
+        end
+        if steps.include?(:run_a_command)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          print 'run command, '
+          exit_status = run_command(output_path, module_args)
+          next unless exit_status.zero?
+        end
+        if steps.include?(:pdk_update)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          next unless pdk_update(output_path).zero?
+          if steps.include?(:use_pdk_ref)
+            ref = return_template_ref
+            pr_title = module_args[:additional_title] ? "#{module_args[:additional_title]} - pdksync_#{ref}" : "pdksync_#{ref}"
+            module_args = module_args.merge(branch_name: "pdksync_#{ref}",
+                                            commit_message: pr_title,
+                                            pr_title: pr_title,
+                                            pdksync_label: @default_pdksync_label)
+          end
+          print 'pdk update, '
+        end
+          if steps.include?(:create_commit)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          git_instance = Git.open(output_path)
+          create_commit(git_instance, module_args[:branch_name], module_args[:commit_message])
+          print 'commit created, '
+        end
+        if steps.include?(:push)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          git_instance = Git.open(output_path)
+          if git_instance.diff(git_instance.current_branch, "#{@push_file_destination}/#{@create_pr_against}").size != 0 # Git::Diff doesn't have empty? # rubocop:disable Style/ZeroLengthPredicate
+            push_staged_files(git_instance, git_instance.current_branch, repo_name)
+            print 'push, '
+          else
+            print 'skipped push, '
+          end
+        end
+        if steps.include?(:create_pr)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          git_instance = Git.open(output_path)
+          if git_instance.diff(git_instance.current_branch, "#{@push_file_destination}/#{@create_pr_against}").size != 0 # Git::Diff doesn't have empty? # rubocop:disable Style/ZeroLengthPredicate
+            pdk_version = return_pdk_version("#{output_path}/metadata.json")
+
+            # If a label is supplied, verify that it is available in the repo
+            label = module_args[:pdksync_label] ? module_args[:pdksync_label] : module_args[:label]
+            label_valid = (label.is_a?(String) && !label.to_str.empty?) ? check_for_label(client, repo_name, label) : nil
+
+            # Exit current iteration if an error occured retrieving a label
+            if label_valid == false
+              raise 'Ensure label is valid'
+            end
+
+            # Create the PR and add link to pr list
+            pr = create_pr(client, repo_name, git_instance.current_branch, pdk_version, module_args[:pr_title])
+            if pr.nil?
+              break
+            end
+
+            pr_list.push(pr.html_url)
+            print 'created pr, '
+
+            # If a valid label is supplied, add this to the PR
+            if label_valid == true
+              add_label(client, repo_name, pr.number, label)
+              print "added label '#{label}' "
+            end
+          else
+            print 'skipped pr, '
+          end
+        end
+        if steps.include?(:clean_branches)
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          delete_branch(client, repo_name, module_args[:branch_name])
+          print 'branch deleted, '
+        end
+        puts 'done.'.green
+      end
+  else
+    puts "(WARNING) No modules listed in #{@managed_modules}".red
+  end
     return if pr_list.size.zero?
     puts "\nPRs created:\n".blue
     pr_list.each do |pr|
       puts pr
+    end
+  end
+    if gem_names.nil? == false
+      gem_names.each do |gem_name|
+        gem_args = args.clone
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        print "#{gem_name}, "
+        repo_name = "#{@namespace}/#{gem_name}"
+        output_path = "#{@pdksync_gem_dir}/#{gem_name}"
+      if steps.include?(:clone_gem)
+        clean_env(output_path) if Dir.exist?(output_path)
+        print 'delete module directory, '
+        @git_repo = clone_directory(@namespace, gem_name, output_path)
+        print 'cloned, '
+        puts "(WARNING) Unable to clone repo for #{gem_name}".red if @git_repo.nil?
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        next if @git_repo.nil?
+      end
+      puts '(WARNING) @output_path does not exist, gem'.red unless File.directory?(output_path)
+      next unless File.directory?(output_path)
+      if steps.include?(:multi_gem_testing)
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        print 'Multi Gem Testing, '
+        current_gem_version = check_gem_latest_version(output_path, gem_name)
+        puts current_gem_version
+        new_gem_version = update_gem_latest_version_by_one(current_gem_version)
+        puts new_gem_version
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        exit_status = run_command(output_path, "sed s/current_gem_version/new_gem_version/g #{gem_args[:version_file]} >> test.yml")
+        puts 'Updated the version'
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        exit_status = run_command(output_path, "cp test.yml #{gem_args[:version_file]}")
+        puts 'bundle install'
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        exit_status = run_command(output_path, 'bundle install')
+        puts 'building gem'
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        exit_status = run_command(output_path, "bundle exec #{gem_args[:build_gem]}")
+        next unless exit_status.zero?
+        puts 'uploading packages'
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        Dir.chdir("#{output_path}/#{gem_args[:gem_path]}") unless Dir.pwd == output_path
+        Dir.glob('*.gem') {|filename|
+          puts filename
+          Dir.chdir(main_path) unless Dir.pwd == main_path
+          exit_status = run_command("#{output_path}/#{gem_args[:gem_path]}", "curl -F package=@#{filename} https://"+@gemfury_token+"@push.fury.io/#{gem_args[:gemfury_username]}/")
+        }
+      end
+      if steps.include?(:run_a_command)
+        Dir.chdir(main_path) unless Dir.pwd == main_path
+        print 'run command, '
+        exit_status = run_command(output_path, gem_args)
+        next unless exit_status.zero?
+      end
+      end
+    else
+      puts "No gems listed in #{@managed_gems}".red
     end
   end
 
@@ -207,6 +289,25 @@ module PdkSync
     end
   rescue StandardError => error
     puts "(WARNING) Unable to check latest pdk version. #{error}".red
+  end
+
+  # @summary
+  #   Check the most recent tagged release on GitHub for the gem
+  def self.check_gem_latest_version(output_path,gem_to_test)
+    remote_version = Octokit.tags("puppetlabs/#{gem_to_test}").first[:name]
+  rescue StandardError => error
+    puts "(WARNING) Unable to check latest gem version. #{error}".red
+    return remote_version
+  end
+
+  # @summary
+  #   Update the gem version by one
+  def self.update_gem_latest_version_by_one(gem_version)
+    current_version = Gem::Version.new gem_version
+    new_version = current_version.bump
+  rescue StandardError => error
+    puts "(WARNING) Unable to check latest gem version. #{error}".red
+    return new_version
   end
 
   # @summary
@@ -235,6 +336,17 @@ module PdkSync
   end
 
   # @summary
+  #   This method when called will access a file set by the global variable '@managed_gems' and retrieve the information within as an array.
+  # @return [Array]
+  #   An array of different gem names.
+  def self.return_gems
+    raise "File '#{@managed_gems}' is empty/does not exist" if File.size?(@managed_gems).nil?
+    YAML.safe_load(File.open(@managed_gems))
+  end
+
+  
+
+  # @summary
   #   This method when called will parse an array of module names and verify
   #   whether they are valid repo or project names on the configured Git
   #   hosting platform.
@@ -249,6 +361,28 @@ module PdkSync
       # If module name is invalid, push it to invalid names array
       unless client.repository?("#{@namespace}/#{module_name}")
         invalid_names.push(module_name)
+        next
+      end
+    end
+    # Raise error if any invalid matches were found
+    raise "Could not find the following repositories: #{invalid_names}" unless invalid_names.empty?
+  end
+
+  # @summary
+  #   This method when called will parse an array of module names and verify
+  #   whether they are valid repo or project names on the configured Git
+  #   hosting platform.
+  # @param [PdkSync::GitPlatformClient] client
+  #   The Git platform client used to get a repository.
+  # @param [Array] module_names
+  #   String array of the names of Git platform repos
+  def self.validate_gems_exist(client, gem_names)
+    invalid_names = []
+    raise "Error reading in modules. Check syntax of '#{@gem_modules}'." unless !gem_names.nil? && gem_names.is_a?(Array)
+    gem_names.each do |gem_name|
+      # If gem name is invalid, push it to invalid names array
+      unless client.repository?("#{@namespace}/#{gem_name}")
+        invalid_names.push(gem_name)
         next
       end
     end
@@ -312,6 +446,64 @@ module PdkSync
   # @return [Integer]
   #   The status code of the command run.
   def self.run_command(output_path, command)
+    stdout = ''
+    stderr = ''
+    status = Process::Status
+
+    Dir.chdir(output_path) unless Dir.pwd == output_path
+
+    # Environment cleanup required due to Ruby subshells using current Bundler environment
+    if command =~ %r{^bundle}
+      Bundler.with_clean_env do
+        stdout, stderr, status = Open3.capture3(command)
+      end
+    else
+      stdout, stderr, status = Open3.capture3(command)
+    end
+
+    puts "\n#{stdout}\n".yellow
+    puts "(FAILURE) Unable to run command '#{command}': #{stderr}".red unless status.exitstatus.zero?
+    status.exitstatus
+  end
+
+  # @summary
+  #   This method when called will run a command command at the given location, with an error message being thrown if it is not successful.
+  # @param [String] output_path
+  #   The location that the command is to be run from.
+  # @param [String] command
+  #   The command to be run.
+  # @return [Integer]
+  #   The status code of the command run.
+  def self.make_change_build_package(output_path, command)
+    stdout = ''
+    stderr = ''
+    status = Process::Status
+
+    Dir.chdir(output_path) unless Dir.pwd == output_path
+
+    # Environment cleanup required due to Ruby subshells using current Bundler environment
+    if command =~ %r{^bundle}
+      Bundler.with_clean_env do
+        stdout, stderr, status = Open3.capture3(command)
+      end
+    else
+      stdout, stderr, status = Open3.capture3(command)
+    end
+
+    puts "\n#{stdout}\n".yellow
+    puts "(FAILURE) Unable to run command '#{command}': #{stderr}".red unless status.exitstatus.zero?
+    status.exitstatus
+  end
+
+  # @summary
+  #   This method when called will run a command command at the given location, with an error message being thrown if it is not successful.
+  # @param [String] output_path
+  #   The location that the command is to be run from.
+  # @param [String] command
+  #   The command to be run.
+  # @return [Integer]
+  #   The status code of the command run.
+  def self.upload_gem(output_path, command)
     stdout = ''
     stderr = ''
     status = Process::Status
