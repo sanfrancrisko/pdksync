@@ -70,6 +70,9 @@ Metrics/AbcSize:
   Enabled: false
 Metrics/BlockLength:
   Enabled: false
+Metrics/BlockNesting:
+  CountBlocks: true
+  Max: 5
 Metrics/ClassLength:
   Enabled: false
 Metrics/CyclomaticComplexity:

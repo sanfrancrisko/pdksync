@@ -3,7 +3,7 @@
 #- cisco_ios
 #- device_manager
 #- provision
-#- puppetlabs-accounts
+- puppetlabs-accounts
 #- puppetlabs-acl
 #- puppetlabs-apache
 #- puppetlabs-apt

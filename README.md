@@ -127,6 +127,37 @@ bundle exec rake 'pdksync:fetch_test_results[]'
 
 Once the verified gem is released we can use pdksync to update the the new version of gem released in the  .sync.yaml file.
 
+pdksync tool is extended with the new feature to perform multi gem testing.(`puppet-module-gems`)This functionality will identify the current version and bump the version by one.Then it will build and push the gems to gemfury account.Export the GEMFURY_TOKEN to use this rake task.
+
+ ```shell
+   export GEMFURY_TOKEN=<access_token>
+   ```
+
+Update the gem in the below file
+managed_gems.yml:
+```yaml
+---
+- gemrepo
+```
+
+Run the following commands to check that everything is working as expected:
+
+```shell
+bundle install --path .bundle/gems/
+bundle exec rake -T
+bundle exec rake git:clone_managed_gems
+```
+Below given are the workflows for doing multi gem testing with pdksync.
+
+In this workflow we can clone gems, update the version, build the gem, push the changes to gemfury and update the gem file of the required modules with the latest gem updated in the fury.Then we can create PR or run tests locally or run tests through jenkins to verify the module test results.
+
+```shell
+bundle install --path .bundle/gems/
+bundle exec rake git:clone_managed_gems
+bundle exec rake 'pdksync:multi_gem_testing[]'
+bundle exec rake 'pdksync:multigem_file_update[]'
+```
+
 The rake tasks take in a file, `managed_modules.yml`, stored within the local directory that lists all the repositories that need to be updated. It then clones them, one after another, so that a local copy exists. The `pdk update` command is ran against this local copy, with the subsequent changes being added into a commit on a unique branch. It is then pushed back to the remote master — where the local copy was originally cloned. A pull request against master is opened, and pdksync begins to clone the next repository.
 
 By default, pdksync will supply a label to a PR (default is 'maintenance'). This can be changed by creating `pdksync.yml` in the local directory and setting the `pdksync_label` key. You must ensure that the label selected exists on the modules that you are applying pdksync to. Should you wish to disable this feature, set `pdksync_label` to an empty string i.e. `''`. Similarly, when supplying a label using the `git:create_pr` rake task, the label must exist on each of the managed modules to run successfully.
@@ -143,7 +174,7 @@ The following rake tasks are available with pdksync:
 - `pdksync[:additional_title]` Run full pdksync process, clone repository, pdk update, create pr. Additional information can be added to the title, which will be appended before the reference section.
   - `rake pdksync` PR title outputs as `pdksync - pdksync_heads/master-0-gabccfb1`
   - `rake 'pdksync[MODULES-8231]'` PR title outputs as `pdksync - MODULES-8231 - pdksync_heads/master-0-gabccfb1`
-- `pdksync:run_a_command[:command]` Run a command against modules eg rake 'pdksync:run_a_command[complex command here -f -gx]'
+- `pdksync:run_a_command[:command, :option]` Run a command against modules eg rake 'pdksync:run_a_command[complex command here -f -gx, 'backgroud']'. :option is an optional parameter which states to run command in backgroud.
 - `pdksync:gem_file_update[[:gem_to_test, :gem_line, :gem_sha_finder, :gem_sha_replacer, :gem_version_finder, :gem_version_replacer, :gem_branch_finder, :gem_branch_replacer]]` Run gem_file_update against modules 
   - eg rake to update gem line `pdksync:gem_file_update['puppet_litmus', "gem 'puppet_litmus'\, git: 'https://github.com/test/puppet_litmus.git'\, branch: 'testbranch'"]'` 
   - eg rake to update sha `pdksync:gem_file_update['puppet_litmus', '', '20ee04ba1234e9e83eb2ffb5056e23d641c7a018', '20ee04ba1234e9e83eb2ffb5056e23d641c7a31']` 
@@ -155,6 +186,9 @@ The following rake tasks are available with pdksync:
   - eg rake 'pdksync:run_tests_locally["default"]'
 - `pdksync:fetch_test_results_locally[]` Fetch litmus modules local run results 
   - eg rake 'pdksync:fetch_test_results_locally[]'
+- `git:clone_managed_gems` Clone managed gems.
+- `pdksync:multi_gem_testing[:version_file, :build_gem, :gem_path, :gemfury_user_name]` Build and Push new gems built to the gemfury account for testing eg rake 'pdksync:multi_gem_testing[]'
+- `pdksync:multigem_file_update[:gem_name, :gemfury_username]` Update Gemfile of the modules with the new gem pushed to fury.'
 
 ### Configuration
 
