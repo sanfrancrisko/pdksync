@@ -1021,7 +1021,7 @@ module PdkSync
       return false if provision_yaml.nil?
       provision_yaml[key] = {}
       provision_yaml[key]['provisioner'] = provisioner
-      provision_yaml[key]['images'] = images
+      provision_yaml[key]['images'] = [images].flatten
       File.write(path_to_provision_yaml, YAML.dump(provision_yaml))
     end
 
