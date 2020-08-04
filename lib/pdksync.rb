@@ -347,6 +347,14 @@ module PdkSync
           Utils.generate_vmpooler_release_checks(output_path, module_args[:puppet_version].to_i)
         end
 
+        if steps.include?(:generate_travis_release_checks)
+          Utils.generate_travis_release_checks(output_path)
+        end
+
+        if steps.include?(:push_puppet7_config_changes)
+          Utils.push_puppet7_config_changes(output_path, client)
+        end
+
         PdkSync::Logger.info 'done'
       end
       table = Terminal::Table.new title: 'Module Test Results', headings: %w[Module Status Result From], rows: report_rows

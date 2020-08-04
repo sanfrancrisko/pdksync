@@ -97,6 +97,16 @@ namespace :pdksync do
   task :generate_vmpooler_release_checks, [:puppet_version] do |_task, args|
     PdkSync.main(steps: [:generate_vmpooler_release_checks], args: args)
   end
+
+  desc 'Generates the appropriate TravisCI configurations for a given Puppet version'
+  task :generate_travis_release_checks do |_task, args|
+    PdkSync.main(steps: [:generate_travis_release_checks], args: args)
+  end
+
+  desc 'Pushes the Puppet 7 test configurations to a branch'
+  task :push_puppet7_config_changes do |_task, args|
+    PdkSync.main(steps: [:push_puppet7_config_changes], args: args)
+  end
 end
 
 namespace :git do

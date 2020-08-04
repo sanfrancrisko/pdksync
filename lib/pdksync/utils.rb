@@ -276,6 +276,7 @@ module PdkSync
         module_temp_ref ||= configuration.pdk_templates_ref
         template_ref = configuration.module_is_authoritive ? module_temp_ref : configuration.pdk_templates_ref
         change_module_template_url(configuration.pdk_templates_url, template_ref) unless configuration.module_is_authoritive
+        require 'pry'; binding.pry
         _stdout, stderr, status = Open3.capture3("#{return_pdk_path} update --force --template-ref=#{template_ref}")
         PdkSync::Logger.fatal "Unable to run `pdk update`: #{stderr}" unless status.exitstatus.zero?
         status.exitstatus
@@ -1015,7 +1016,7 @@ module PdkSync
     def self.add_provision_list(module_path, key, provisioner, images)
       path_to_provision_yaml = "#{module_path}/provision.yaml"
       return false unless File.exist? path_to_provision_yaml
-      PdkSync::Logger.info "Updating #{path_to_provision_yaml}"
+      PdkSync::Logger.info "Updating #{path_to_provision_yaml} with entry: #{key}"
       provision_yaml = YAML.safe_load(File.read(path_to_provision_yaml))
       return false if provision_yaml.nil?
       provision_yaml[key] = {}
@@ -1053,7 +1054,15 @@ module PdkSync
       raise "Unable to determine Windows version from metadata.json: #{ver}" unless win_ver_matcher
       normalized_version = win_ver_matcher['ver']
       normalized_version += win_ver_matcher['rel'].downcase if win_ver_matcher['rel']
+      normalized_version += '-core' if win_ver_matcher['ver'] == '2016' || win_ver_matcher['ver'] == '2019'
+      normalized_version += '-pro' if win_ver_matcher['ver'] == '10'
       normalized_version
+    end
+
+    def self.agent_test_platforms_for_puppet_version(puppet_version)
+      agent_test_platforms = YAML.safe_load(File.read(@puppet_abs_supported_platforms_yaml))
+      raise "No configuration for Puppet #{puppet_version} found in #{@puppet_abs_supported_platforms_yaml}" unless agent_test_platforms.key? puppet_version
+      agent_test_platforms[puppet_version]
     end
 
     # @summary
@@ -1067,21 +1076,18 @@ module PdkSync
     def self.generate_vmpooler_release_checks(module_path, puppet_version)
       PdkSync::Logger.info "Generating release checks provision.yaml key for Puppet version #{puppet_version}"
       # This YAML is where the compatible platforms for each Puppet version is stored
-      agent_test_platforms_yaml_file_path = 'lib/pdksync/conf/puppet_abs_supported_platforms.yaml'
-      agent_test_platforms = YAML.safe_load(File.read(agent_test_platforms_yaml_file_path))
-      raise "No configuration for Puppet #{puppet_version} found in #{agent_test_platforms_yaml_file_path}" unless agent_test_platforms.key? puppet_version
-      agent_test_platforms = agent_test_platforms[puppet_version]
-      module_supported_platforms = module_supported_platforms(module_path)
+      @puppet_abs_supported_platforms_yaml = 'lib/pdksync/conf/puppet_abs_supported_platforms.yaml'
+      agent_test_platforms = agent_test_platforms_for_puppet_version(puppet_version)
       images = []
       PdkSync::Logger.debug 'Processing compatible platforms from metadata.json'
-      module_supported_platforms.each do |os_vers|
+      module_supported_platforms(module_path).each do |os_vers|
         os = os_vers['operatingsystem'].downcase
         # 'Windows' and 'OracleLinux' are the definitions in 'metadata.json', however the VMPooler images are 'win' and 'oracle'
         os = 'win' if os == 'windows'
         os = 'oracle' if os == 'oraclelinux'
         vers = os_vers['operatingsystemrelease']
         if agent_test_platforms.keys.select { |k| k.start_with? os }.empty?
-          PdkSync::Logger.warn "'#{os}' is a compatible platform but was not defined as test platform for Puppet #{puppet_version} in #{agent_test_platforms_yaml_file_path}"
+          PdkSync::Logger.warn "'#{os}' is a compatible platform but was not defined as test platform for Puppet #{puppet_version} in #{@puppet_abs_supported_platforms_yaml}"
           next
         end
         vers.each do |ver|
@@ -1101,6 +1107,66 @@ module PdkSync
       end
       result = add_provision_list(module_path, "release_checks_#{puppet_version}", 'abs', images)
       PdkSync::Logger.warn "#{module_path}/provision.yaml does not exist" unless result
+    end
+
+    def self.generate_travis_config(module_path, travis_provision_configs)
+      PdkSync::Logger.info 'Updating .travis.yaml'
+      travis_yaml_path = "#{module_path}/.travis.yml"
+      travis_yaml = YAML.safe_load(File.read(travis_yaml_path))
+      travis_yaml['dist'] = 'bionic'
+      travis_yaml['rvm'] = ['2.7.0']
+      travis_yaml['stages'] = ['acceptance']
+      travis_yaml['jobs'] = {}
+      travis_yaml['jobs']['fast_finish'] = true
+      travis_yaml['jobs']['include'] = []
+      travis_provision_configs.each do |provision_config|
+        job = {}
+        job['before_script'] = ["bundle exec rake 'litmus:provision_list[#{provision_config}]'", "bundle exec rake 'litmus:install_agent[puppet7-nightly]'", "bundle exec rake litmus:install_module"]
+        job['bundler_args'] = nil
+        job['env'] = "PLATFORMS=#{provision_config}"
+        job['rvm'] = '2.7.0'
+        job['script'] = ["travis_wait 45 bundle exec rake litmus:acceptance:parallel"]
+        job['services'] = 'docker'
+        job['stage'] = 'acceptance'
+        travis_yaml['jobs']['include'] << job
+      end
+      File.write(travis_yaml_path, YAML.dump(travis_yaml))
+    end
+
+
+    def self.generate_travis_release_checks(module_path)
+      puppet_version = 7
+      PdkSync::Logger.info "Generating .travis.yaml config for Puppet #{puppet_version}"
+      puppet_travis_supported_platforms_yaml = 'lib/pdksync/conf/puppet_travis_supported_platforms.yaml'
+      agent_test_platforms = YAML.safe_load(File.read(puppet_travis_supported_platforms_yaml))[puppet_version]
+      travis_provision_configs = []
+      module_supported_platforms(module_path).each do |os_vers|
+        os = os_vers['operatingsystem'].downcase
+        os = 'scientificlinux' if os == 'scientific'
+        next unless agent_test_platforms.keys.include? os
+        vers = os_vers['operatingsystemrelease']
+        vers.each do |ver|
+          next unless agent_test_platforms[os].include? ver
+          PdkSync::Logger.debug "Adding configuration for #{os} #{ver}"
+          provision_list_id = "travis_puppet7_#{os}_#{ver.gsub('.', '_')}"
+          add_provision_list(module_path, provision_list_id, 'docker', "litmusimage/#{os}:#{ver}")
+          travis_provision_configs << provision_list_id
+        end
+      end
+      result = generate_travis_config(module_path, travis_provision_configs)
+      PdkSync::Logger.warn 'Could not update .travis.yaml' unless result
+    end
+
+    def self.push_puppet7_config_changes(module_path, client)
+      repo = "puppetlabs/#{module_path.split('/')[-1]}"
+      branch_name = 'test_puppet7_nightly'
+      git = Git.open(module_path)
+      git.fetch('origin', prune: true)
+      git.pull
+      delete_branch(client, repo, "pdksync_#{branch_name}") if git.is_remote_branch? "pdksync_#{branch_name}"
+      create_commit(git, branch_name, 'PDKSync: Puppet 7 test config')
+      push_staged_files(git, "pdksync_#{branch_name}", repo)
+      create_pr(client, repo, git.current_branch, return_pdk_version("#{module_path}/metadata.json"), "(DO-NOT-MERGE) PDKSync: Puppet 7 test config")
     end
   end
 end
