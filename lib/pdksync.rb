@@ -355,6 +355,10 @@ module PdkSync
           Utils.push_puppet7_config_changes(output_path, client)
         end
 
+        if steps.include?(:generate_gcp_workflow_config)
+          Utils.generate_gcp_workflow_config(output_path)
+        end
+
         PdkSync::Logger.info 'done'
       end
       table = Terminal::Table.new title: 'Module Test Results', headings: %w[Module Status Result From], rows: report_rows

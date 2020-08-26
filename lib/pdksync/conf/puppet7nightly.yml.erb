@@ -1,0 +1,53 @@
+---
+name: "puppet7nightly"
+on:
+  schedule:
+    - cron: '<%= cron_time %>'
+
+jobs:
+  AcceptanceAndSpecTests:
+    env:
+      HONEYCOMB_WRITEKEY: 7f3c63a70eecc61d635917de46bea4e6
+      HONEYCOMB_DATASET: ag7rb27
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up Ruby 2.7
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: 2.7
+      - name: Provision test environment
+        run: |
+          cat <<EOF >> test_machines.json
+          {
+            "url" : "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID",
+            "osList": <%= gcp_images %>
+          }
+          EOF
+          curl -X POST -H "Authorization:bearer ${{ secrets.GCP_PROVISIONER_KEY }}" https://provision-service-6f3kfepqcq-ez.a.run.app/v1/provision --data @test_machines.json > inventory.yaml
+      - name: Install gems
+        run: bundle install
+      - name: Install agent
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 30
+          max_attempts: 5
+          retry_wait_seconds: 60
+          command: bundle exec rake 'litmus:install_agent[puppet7-nightly]'
+      - name: Install module
+        run: bundle exec rake 'litmus:install_module'
+      - name: Run acceptance tests
+        run: bundle exec rake 'litmus:acceptance:parallel[integration]'
+      - name: Spec Tests
+        if: ${{ always() }}
+        run: bundle exec rake parallel_spec
+      - name: Remove test environment
+        if: ${{ always() }}
+        run: |
+          uniqueid=$(cat inventory.yaml | grep -m 1 uuid | cut -d ':' -f 2 | tr -d ' ')
+          cat <<EOF >> delete_resources.json
+          {
+            "uuid" : "$uniqueid"
+          }
+          EOF
+          curl -X DELETE -H "Authorization:bearer ${{ secrets.GCP_PROVISIONER_KEY }}" https://provision-service-6f3kfepqcq-ez.a.run.app/v1/provision --data @delete_resources.json

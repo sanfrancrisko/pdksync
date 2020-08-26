@@ -1168,5 +1168,30 @@ module PdkSync
       push_staged_files(git, "pdksync_#{branch_name}", repo)
       create_pr(client, repo, git.current_branch, return_pdk_version("#{module_path}/metadata.json"), "(DO-NOT-MERGE) PDKSync: Puppet 7 test config")
     end
+
+    @start_time_hour = 0
+
+    def self.generate_gcp_workflow_config(module_path)
+      puppet_version = 7
+      agent_test_platforms = YAML.safe_load(File.read('lib/pdksync/conf/puppet_gcp_supported_platforms.yaml'))[7]
+      gcp_images = []
+      module_supported_platforms(module_path).each do |os_vers|
+        os = os_vers['operatingsystem'].downcase
+        next unless agent_test_platforms.keys.include? os
+        vers = os_vers['operatingsystemrelease']
+        vers.each do |ver|
+          normalised_ver = ver.downcase.gsub('server', '').gsub(' ', '')
+          # require 'pry'; binding.pry if ver.include? '2012'
+          next unless agent_test_platforms[os][normalised_ver]
+          gcp_images << agent_test_platforms[os][normalised_ver]
+        end
+      end
+      cron_time = "0 #{@start_time_hour} * * *"
+      @start_time_hour += 1
+      workflow = ERB.new(File.read('lib/pdksync/conf/puppet7nightly.yml.erb')).result(binding)
+      File.write(File.join(module_path, '.github', 'workflows', 'puppet7nightly.yml'), workflow)
+      workflow = ERB.new(File.read('lib/pdksync/conf/puppet7manual.yml.erb')).result(binding)
+      File.write(File.join(module_path, '.github', 'workflows', 'puppet7manual.yml'), workflow)
+    end
   end
 end

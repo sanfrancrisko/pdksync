@@ -1,0 +1,16 @@
+---
+7:
+  centos:
+    '7': 'centos-7-v20200811'
+  debian:
+    '10': 'debian-10-buster-v20200805'
+  redhat:
+    '8': 'rhel-8-v20200811'
+  sles:
+    '15': 'sles-15-sp2-v20200804'
+  ubuntu:
+    '20.04': 'ubuntu-2004-focal-v20200810'
+  windows:
+    '2012r2': 'windows-server-2012-r2-dc-v20200813'
+    '2016': 'windows-server-2016-dc-v20200813'
+    '2019': 'windows-server-2019-dc-core-v20200813'

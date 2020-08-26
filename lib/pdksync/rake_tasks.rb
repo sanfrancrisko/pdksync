@@ -107,6 +107,11 @@ namespace :pdksync do
   task :push_puppet7_config_changes do |_task, args|
     PdkSync.main(steps: [:push_puppet7_config_changes], args: args)
   end
+
+  desc 'Generate a GHAction workflow config that uses GCP provisioning'
+  task :generate_gcp_workflow_config do |_task, args|
+    PdkSync.main(steps: [:generate_gcp_workflow_config], args: args)
+  end
 end
 
 namespace :git do
