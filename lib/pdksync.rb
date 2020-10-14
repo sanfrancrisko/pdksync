@@ -207,6 +207,10 @@ module PdkSync
           module_type = Utils.module_type(output_path, module_name)
           Utils.run_tests_locally(output_path, module_type, module_args[:provision_type], module_name, module_args[:puppet_collection])
         end
+        if steps.include?(:run_tests_locally_batched)
+          module_type = Utils.module_type(output_path, module_name)
+          Utils.run_tests_locally_batched(output_path, module_type, module_args[:provision_type], module_name, module_args[:puppet_collection], module_args[:batch_size],)
+        end
         if steps.include?(:fetch_test_results_locally)
           Dir.chdir(main_path) unless Dir.pwd == main_path
           PdkSync::Logger.info 'Fetch test results for local run '

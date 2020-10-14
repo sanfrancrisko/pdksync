@@ -53,6 +53,11 @@ namespace :pdksync do
     PdkSync.main(steps: [:run_tests_locally], args: args)
   end
 
+  desc "Run test against modules eg rake 'run_tests_locally_batched[litmus, 'provision_type']'"
+  task :run_tests_locally_batched, [:provision_type, :puppet_collection, :batch_size] do |_task, args|
+    PdkSync.main(steps: [:run_tests_locally_batched], args: args)
+  end
+
   desc "Fetch run results against modules eg rake 'fetch_test_results_locally[litmus]'"
   task :fetch_test_results_locally do
     PdkSync.main(steps: [:fetch_test_results_locally])

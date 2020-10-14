@@ -603,6 +603,20 @@ module PdkSync
       PdkSync::Logger.warn "(WARNING) Executing testcases locally supports only for litmus'" if module_type != 'litmus'
     end
 
+    def self.run_tests_locally_batched(output_path, module_type, provision_type, module_name, puppet_collection = 'puppet7-nightly', batch_size = 4)
+      PdkSync::Logger.info "Acceptance test module concurrency: #{batch_size}"
+
+      while `ps -ef | grep 'litmus:acceptance:parallel' | grep -c -v 'grep'`.chomp.to_i >= batch_size.to_i
+        PdkSync::Logger.info 'At maximum number of concurrent test threads, backing off'
+        sleep 60
+      end
+
+      PdkSync::Logger.info "Kicking off tests against #{module_name} (provision: #{provision_type}, agent: #{puppet_collection})"
+      run_tests_locally(output_path, module_type, provision_type, module_name, puppet_collection)
+      PdkSync::Logger.info 'Sleeping 3 minutes to allow provisioning, agent installation and module installation to complete'
+      sleep 180
+    end
+
     # @summary
     #   This method when called will fetch the module tests results.
     # @param [String] output_path
@@ -1095,12 +1109,13 @@ module PdkSync
           else
             next unless agent_test_platforms[os].include? ver
             PdkSync::Logger.debug "'#{os} #{ver}' SUPPORTED by Puppet #{puppet_version}"
-            images << "#{os}-#{ver}-x86_64"
+            images << "#{os}-#{ver.gsub('.', '')}-x86_64"
           end
         end
       end
       result = add_provision_list(module_path, "release_checks_#{puppet_version}", 'abs', images)
       PdkSync::Logger.warn "#{module_path}/provision.yaml does not exist" unless result
     end
+
   end
 end
