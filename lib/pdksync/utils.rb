@@ -575,13 +575,13 @@ module PdkSync
       file = File.open('acc.sh', 'w')
       file.puts '#!/bin/sh'
 
-      if puppet_collection
-        file.puts "export PUPPET_GEM_VERSION='~> #{puppet_collection}'"
-      end
+      # if puppet_collection
+      #   file.puts "export PUPPET_GEM_VERSION='~> #{puppet_collection}'"
+      # end
       file.puts "rm -rf #{output_path}/Gemfile.lock;rm -rf #{output_path}/.bundle"
       file.puts 'bundle install --path .bundle/gems/ --jobs 4'
       file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]'"
-      file.puts 'bundle exec rake litmus:install_agent'
+      file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}]"
       file.puts 'bundle exec rake litmus:install_module'
       file.puts 'bundle exec rake litmus:acceptance:parallel'
       file.puts 'bundle exec rake litmus:tear_down'
