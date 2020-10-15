@@ -617,7 +617,7 @@ module PdkSync
       sleep 180
     end
 
-    def self.generate_test_script(output_path, module_type, provision_type, module_name, puppet_collection = 'puppet7-nightly')
+    def self.generate_test_script(output_path, module_type, provision_type = 'release_checks_7', module_name, puppet_collection = 'puppet7-nightly')
       if module_type == 'litmus'
         File.open("#{output_path}/acc.sh", 'w') do |file|
           file.puts '#!/bin/sh'
@@ -625,8 +625,8 @@ module PdkSync
           file.puts 'rm -rf .bundle'
           file.puts 'currentDate=$(date +"%Y_%m_%d")'
           file.puts 'mkdir -p .logs/$currentDate'
-          file.puts 'currentDateTime=("$currentDate"__$(date +%H_%M))'
-          file.puts 'logFile=".logs/$currentDate/$currentDateTime_acceptance_tests.log"'
+          file.puts 'currentTime=$(date +"%H_%M")'
+          file.puts 'logFile=".logs/$currentDate/$currentDate__$currentTime____acceptance_tests.log"'
           file.puts 'bundle install --path .bundle >> $logFile'
           file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile"
           file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile"
