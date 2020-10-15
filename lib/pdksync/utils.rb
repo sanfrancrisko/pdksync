@@ -1115,6 +1115,7 @@ module PdkSync
       win_ver_matcher = ver.match(%r{(?:Server\s)?(?<ver>\d+)(?:\s(?<rel>R\d))?})
       raise "Unable to determine Windows version from metadata.json: #{ver}" unless win_ver_matcher
       normalized_version = win_ver_matcher['ver']
+      normalized_version = '10-pro' if normalized_version == '10'
       normalized_version += win_ver_matcher['rel'].downcase if win_ver_matcher['rel']
       normalized_version
     end
