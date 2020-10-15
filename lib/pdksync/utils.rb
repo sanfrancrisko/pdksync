@@ -617,7 +617,7 @@ module PdkSync
       sleep 180
     end
 
-    def self.generate_test_script(output_path, module_type, provision_type = 'release_checks_7', module_name, puppet_collection = 'puppet7-nightly')
+    def self.generate_test_script(output_path, module_type, module_name, provision_type = 'release_checks_7', puppet_collection = 'puppet7-nightly')
       if module_type == 'litmus'
         File.open("#{output_path}/acc.sh", 'w') do |file|
           file.puts '#!/bin/sh'

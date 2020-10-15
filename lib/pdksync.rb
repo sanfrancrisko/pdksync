@@ -213,7 +213,7 @@ module PdkSync
         end
         if steps.include?(:generate_test_script)
           module_type = Utils.module_type(output_path, module_name)
-          Utils.generate_test_script(output_path, module_type, module_args[:provision_type], module_name, module_args[:puppet_collection])
+          Utils.generate_test_script(output_path, module_type, module_name, module_args[:provision_type], module_args[:puppet_collection])
         end
         if steps.include?(:generate_crontab_entry)
           Utils.generate_crontab_entry(output_path)
