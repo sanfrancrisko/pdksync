@@ -224,6 +224,11 @@ module PdkSync
       PdkSync::Logger.fatal "Cloning #{module_name} has failed. #{error}"
     end
 
+    def self.clone_directory_https(namespace, module_name, output_path)
+      clone_url = "https://github.com/#{namespace}/#{module_name}"
+      `git clone #{clone_url} #{output_path}/#{module_name}`
+    end
+
     # @summary
     #   This method when called will run a command command at the given location, with an error message being thrown if it is not successful.
     # @param [String] output_path
@@ -660,6 +665,7 @@ module PdkSync
           h += 1
           m = (m - 60)
         end
+        h = 0 if h == 24
         File.open(crontab_path, 'a') do |file|
           file.puts("#{m} #{h} * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
         end
