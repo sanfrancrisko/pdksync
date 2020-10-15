@@ -628,12 +628,12 @@ module PdkSync
           file.puts 'currentTime=$(date +"%H_%M")'
           file.puts 'logFile=".logs/${currentDate}/${currentDate}__${currentTime}____acceptance_tests.log"'
           file.puts 'echo "Logging to $logFile"'
-          file.puts 'bundle install --path .bundle >> $logFile'
-          file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile"
-          file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile"
-          file.puts 'bundle exec rake litmus:install_module >> $logFile'
-          file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile'
-          file.puts 'bundle exec rake litmus:tear_down >> $logFile'
+          file.puts 'bundle install --path .bundle >> $logFile 2>&1'
+          file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile 2>&1"
+          file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile 2>&1"
+          file.puts 'bundle exec rake litmus:install_module >> $logFile 2>&1'
+          file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile 2>&1'
+          file.puts 'bundle exec rake litmus:tear_down >> $logFile 2>&1'
         end
         `chmod +x #{output_path}/acc.sh`
       else
