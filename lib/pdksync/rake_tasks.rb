@@ -58,6 +58,16 @@ namespace :pdksync do
     PdkSync.main(steps: [:run_tests_locally_batched], args: args)
   end
 
+  desc "Generate test script for each module"
+  task :generate_test_script, [:provision_type, :puppet_collection] do |_task, args|
+    PdkSync.main(steps: [:generate_test_script], args: args)
+  end
+
+  desc 'Generate crontab entry for each module'
+  task :generate_crontab_entry do |_task, args|
+    PdkSync.main(steps: [:generate_crontab_entry], args: args)
+  end
+
   desc "Fetch run results against modules eg rake 'fetch_test_results_locally[litmus]'"
   task :fetch_test_results_locally do
     PdkSync.main(steps: [:fetch_test_results_locally])

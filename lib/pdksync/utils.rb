@@ -617,6 +617,55 @@ module PdkSync
       sleep 180
     end
 
+    def self.generate_test_script(output_path, module_type, provision_type, module_name, puppet_collection = 'puppet7-nightly')
+      if module_type == 'litmus'
+        File.open("#{output_path}/acc.sh", 'w') do |file|
+          file.puts '#!/bin/sh'
+          file.puts 'rm -rf Gemfile.lock'
+          file.puts 'rm -rf .bundle'
+          file.puts 'currentDate=$(date +"%Y_%m_%d")'
+          file.puts 'mkdir -p .logs/$currentDate'
+          file.puts 'currentDateTime=("$currentDate"__$(date +%H_%M))'
+          file.puts 'logFile=".logs/$currentDate/$currentDateTime_acceptance_tests.log"'
+          file.puts 'bundle install --path .bundle >> $logFile'
+          file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile"
+          file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile"
+          file.puts 'bundle exec rake litmus:install_module >> $logFile'
+          file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile'
+          file.puts 'bundle exec rake litmus:tear_down >> $logFile'
+        end
+        `chmod +x #{output_path}/acc.sh`
+      else
+        PdkSync::Logger.warn "Skipping #{module_name} as it is not a Litmus compatible module"
+      end
+    end
+
+    @initialise_crontab = true
+
+    def self.generate_crontab_entry(output_path)
+      require 'pry'; binding.pry
+      crontab_path = '/var/spool/cron/crontabs/iactestrunner'
+
+      if @initialise_crontab
+        File.delete(crontab_path)
+        File.open(crontab_path, 'w') do |file|
+          file.write("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
+        end
+        @initialise_crontab = false
+      else
+        last_cron_time = `tail -n 1 #{crontab_path} | cut -d ' ' -f 1-2`.chomp
+        m, h = last_cron_time.split(' ').map(&:to_i)
+        m += 10
+        if m >= 60
+          h += 1
+          m = 0
+        end
+        File.open(crontab_path, 'a') do |file|
+          file.write("#{m} #{h} * * * (/home/iactestrunner/pdksync/#{output_path})")
+        end
+      end
+    end
+
     # @summary
     #   This method when called will fetch the module tests results.
     # @param [String] output_path
