@@ -644,7 +644,6 @@ module PdkSync
     @initialise_crontab = true
 
     def self.generate_crontab_entry(output_path)
-      require 'pry'; binding.pry
       crontab_path = '/var/spool/cron/crontabs/iactestrunner'
 
       if @initialise_crontab
