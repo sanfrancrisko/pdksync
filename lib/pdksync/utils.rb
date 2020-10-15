@@ -649,12 +649,12 @@ module PdkSync
     @initialise_crontab = true
 
     def self.generate_crontab_entry(output_path)
-      crontab_path = '/var/spool/cron/crontabs/iactestrunner'
+      crontab_path = '/etc/cron.d/iactestrunner'
 
       if @initialise_crontab
         File.delete(crontab_path)
         File.open(crontab_path, 'w') do |file|
-          file.puts("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && CI=true ./acc.sh)")
+          file.puts("0 3 * * * iactestrunner (cd /home/iactestrunner/pdksync/#{output_path} && CI=true ./acc.sh)")
         end
         @initialise_crontab = false
       else
@@ -667,9 +667,11 @@ module PdkSync
         end
         h = 0 if h == 24
         File.open(crontab_path, 'a') do |file|
-          file.puts("#{m} #{h} * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
+          file.puts("#{m} #{h} * * * iactestrunner (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
         end
       end
+      `sudo chown iactestrunner:crontab #{crontab_path}`
+      `sudo chmod 600 #{crontab_path}`
     end
 
     # @summary
