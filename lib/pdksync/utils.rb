@@ -661,7 +661,7 @@ module PdkSync
           m = 0
         end
         File.open(crontab_path, 'a') do |file|
-          file.write("#{m} #{h} * * * (/home/iactestrunner/pdksync/#{output_path})")
+          file.puts("#{m} #{h} * * * (/home/iactestrunner/pdksync/#{output_path})")
         end
       end
     end
