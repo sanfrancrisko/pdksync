@@ -624,9 +624,10 @@ module PdkSync
           file.puts 'rm -rf Gemfile.lock'
           file.puts 'rm -rf .bundle'
           file.puts 'currentDate=$(date +"%Y_%m_%d")'
-          file.puts 'mkdir -p .logs/$currentDate'
+          file.puts 'mkdir -p .logs/${currentDate}'
           file.puts 'currentTime=$(date +"%H_%M")'
-          file.puts 'logFile=".logs/$currentDate/$currentDate__$currentTime____acceptance_tests.log"'
+          file.puts 'logFile=".logs/${currentDate}/${currentDate}__${currentTime}____acceptance_tests.log"'
+          file.puts 'echo "Logging to $logFile"'
           file.puts 'bundle install --path .bundle >> $logFile'
           file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile"
           file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile"
