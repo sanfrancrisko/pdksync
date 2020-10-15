@@ -649,7 +649,7 @@ module PdkSync
       if @initialise_crontab
         File.delete(crontab_path)
         File.open(crontab_path, 'w') do |file|
-          file.puts("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
+          file.puts("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && CI=true ./acc.sh)")
         end
         @initialise_crontab = false
       else
