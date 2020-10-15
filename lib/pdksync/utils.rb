@@ -617,7 +617,7 @@ module PdkSync
       sleep 180
     end
 
-    def self.generate_test_script(output_path, module_type, module_name, provision_type = 'release_checks_7', puppet_collection = 'puppet7-nightly')
+    def self.generate_test_script(output_path, module_type, module_name, provision_type, puppet_collection)
       if module_type == 'litmus'
         File.open("#{output_path}/acc.sh", 'w') do |file|
           file.puts '#!/bin/sh'
@@ -649,16 +649,16 @@ module PdkSync
       if @initialise_crontab
         File.delete(crontab_path)
         File.open(crontab_path, 'w') do |file|
-          file.write("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
+          file.puts("0 4 * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
         end
         @initialise_crontab = false
       else
         last_cron_time = `tail -n 1 #{crontab_path} | cut -d ' ' -f 1-2`.chomp
         m, h = last_cron_time.split(' ').map(&:to_i)
-        m += 10
+        m += 15
         if m >= 60
           h += 1
-          m = 0
+          m = (m - 60)
         end
         File.open(crontab_path, 'a') do |file|
           file.puts("#{m} #{h} * * * (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")

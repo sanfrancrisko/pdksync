@@ -60,6 +60,7 @@ namespace :pdksync do
 
   desc "Generate test script for each module"
   task :generate_test_script, [:provision_type, :puppet_collection] do |_task, args|
+    args.with_defaults(:provision_type => 'release_checks_7', :puppet_collection => 'puppet7-nightly')
     PdkSync.main(steps: [:generate_test_script], args: args)
   end
 
