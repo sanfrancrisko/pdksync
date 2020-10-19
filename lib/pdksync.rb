@@ -216,7 +216,7 @@ module PdkSync
           Utils.generate_test_script(output_path, module_type, module_name, module_args[:provision_type], module_args[:puppet_collection])
         end
         if steps.include?(:generate_crontab_entry)
-          Utils.generate_crontab_entry(output_path)
+          Utils.generate_crontab_entry(output_path, module_args[:honeycomb_writekey], module_args[:honeycomb_dataset], module_args[:start_time], module_args[:spacing_mins])
         end
         if steps.include?(:fetch_test_results_locally)
           Dir.chdir(main_path) unless Dir.pwd == main_path

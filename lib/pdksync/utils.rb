@@ -624,14 +624,24 @@ module PdkSync
 
     def self.generate_test_script(output_path, module_type, module_name, provision_type, puppet_collection)
       if module_type == 'litmus'
+        # echo $(date --iso=s).log (for filename)
         File.open("#{output_path}/acc.sh", 'w') do |file|
           file.puts '#!/bin/sh'
+          file.puts 'set -e'
+          file.puts 'set -v'
+          file.puts 'export CI=true'
+          file.puts 'export GITHUB_ACTIONS=true'
+          file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+          file.puts 'export GITHUB_RUN_ID=cron'
+          file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+          file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+          file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
           file.puts 'rm -rf Gemfile.lock'
           file.puts 'rm -rf .bundle'
           file.puts 'currentDate=$(date +"%Y_%m_%d")'
           file.puts 'mkdir -p .logs/${currentDate}'
           file.puts 'currentTime=$(date +"%H_%M")'
-          file.puts 'logFile=".logs/${currentDate}/${currentDate}__${currentTime}____acceptance_tests.log"'
+          file.puts 'logFile=".logs/${currentDate}/$(date --iso=s).log"'
           file.puts 'echo "Logging to $logFile"'
           file.puts 'bundle install --path .bundle >> $logFile 2>&1'
           file.puts "bundle exec rake 'litmus:provision_list[#{provision_type}]' >> $logFile 2>&1"
@@ -648,30 +658,31 @@ module PdkSync
 
     @initialise_crontab = true
 
-    def self.generate_crontab_entry(output_path)
-      crontab_path = '/etc/cron.d/iactestrunner'
-
+    def self.generate_crontab_entry(output_path, honeycomb_writekey, honeycomb_dataset, start_time, spacing_mins)
+      @cron_time = start_time unless defined?(@cron_time)
+      path_to_module = File.join(Dir.pwd, output_path)
       if @initialise_crontab
-        File.delete(crontab_path)
-        File.open(crontab_path, 'w') do |file|
-          file.puts("0 3 * * * iactestrunner (cd /home/iactestrunner/pdksync/#{output_path} && CI=true ./acc.sh)")
+        PdkSync::Logger.info 'Outputting cron config to /tmp/cron_tab'
+        File.open('/tmp/cron_tab', 'w') do |file|
+          file.puts 'Copy & paste the following in to the editor when "crontab -e" is invoked from the "iactestrunner" account'
+          file.puts "DON'T FORGET TO ADD AN EXTRA NEW LINE AT THE END!"
+          file.puts ''
+          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && CI=true HONEYCOMB_WRITEKEY=#{honeycomb_writekey} HONEYCOMB_DATASET=#{honeycomb_dataset} ./acc.sh)'")
         end
         @initialise_crontab = false
       else
-        last_cron_time = `tail -n 1 #{crontab_path} | cut -d ' ' -f 1-2`.chomp
-        m, h = last_cron_time.split(' ').map(&:to_i)
-        m += 15
+        m, h = @cron_time.split(' ').map(&:to_i)
+        m += spacing_mins.to_i
         if m >= 60
           h += 1
           m = (m - 60)
         end
         h = 0 if h == 24
-        File.open(crontab_path, 'a') do |file|
-          file.puts("#{m} #{h} * * * iactestrunner (cd /home/iactestrunner/pdksync/#{output_path} && ./acc.sh)")
+        @cron_time = "#{m} #{h}"
+        File.open('/tmp/cron_tab', 'a') do |file|
+          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && CI=true HONEYCOMB_WRITEKEY=#{honeycomb_writekey} HONEYCOMB_DATASET=#{honeycomb_dataset} ./acc.sh)'")
         end
       end
-      `sudo chown iactestrunner:crontab #{crontab_path}`
-      `sudo chmod 600 #{crontab_path}`
     end
 
     # @summary
