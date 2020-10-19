@@ -667,7 +667,7 @@ module PdkSync
           file.puts 'Copy & paste the following in to the editor when "crontab -e" is invoked from the "iactestrunner" account'
           file.puts "DON'T FORGET TO ADD AN EXTRA NEW LINE AT THE END!"
           file.puts ''
-          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && CI=true HONEYCOMB_WRITEKEY=#{honeycomb_writekey} HONEYCOMB_DATASET=#{honeycomb_dataset} ./acc.sh)'")
+          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && ./acc.sh)'")
         end
         @initialise_crontab = false
       else
