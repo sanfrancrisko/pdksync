@@ -648,6 +648,7 @@ module PdkSync
           file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile 2>&1"
           file.puts 'bundle exec rake litmus:install_module >> $logFile 2>&1'
           file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile 2>&1'
+          file.puts 'exit 0'
         end
         `chmod +x #{output_path}/acc.sh`
         File.open("#{output_path}/teardown.sh", 'w') do |file|
