@@ -685,7 +685,7 @@ module PdkSync
           file.puts 'Copy & paste the following in to the editor when "crontab -e" is invoked from the "iactestrunner" account'
           file.puts "DON'T FORGET TO ADD AN EXTRA NEW LINE AT THE END!"
           file.puts ''
-          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync && ruby clone_managed_modules_https.rb)'")
+          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync && ruby clone_managed_modules_https.rb && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_vmpooler_release_checks[7]\" && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_test_script\")'")
         end
         @initialise_crontab = false
       end
