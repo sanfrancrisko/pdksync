@@ -65,7 +65,7 @@ namespace :pdksync do
   end
 
   desc 'Generate crontab entry for each module'
-  task :generate_crontab_entry, [:honeycomb_writekey, :honeycomb_dataset, :start_time, :spacing_mins] do |_task, args|
+  task :generate_crontab_entry, [:start_time, :spacing_mins] do |_task, args|
     args.with_defaults(:start_time => '0 3', :spacing_mins => 20)
     PdkSync.main(steps: [:generate_crontab_entry], args: args)
   end

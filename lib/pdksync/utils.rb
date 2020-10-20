@@ -648,9 +648,27 @@ module PdkSync
           file.puts "bundle exec rake litmus:install_agent[#{puppet_collection}] >> $logFile 2>&1"
           file.puts 'bundle exec rake litmus:install_module >> $logFile 2>&1'
           file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile 2>&1'
-          file.puts 'bundle exec rake litmus:tear_down >> $logFile 2>&1'
         end
         `chmod +x #{output_path}/acc.sh`
+        File.open("#{output_path}/teardown.sh", 'w') do |file|
+          file.puts '#!/bin/sh'
+          file.puts 'set -e'
+          file.puts 'set -v'
+          file.puts 'export CI=true'
+          file.puts 'export GITHUB_ACTIONS=true'
+          file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+          file.puts 'export GITHUB_RUN_ID=cron'
+          file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+          file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+          file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
+          file.puts 'currentDate=$(date +"%Y_%m_%d")'
+          file.puts 'mkdir -p .logs/${currentDate}'
+          file.puts 'currentTime=$(date +"%H_%M")'
+          file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_teardown.log"'
+          file.puts 'echo "Logging to $logFile"'
+          file.puts 'bundle exec rake litmus:tear_down >> $logFile 2>&1'
+        end
+        `chmod +x #{output_path}/teardown.sh`
       else
         PdkSync::Logger.warn "Skipping #{module_name} as it is not a Litmus compatible module"
       end
@@ -658,7 +676,7 @@ module PdkSync
 
     @initialise_crontab = true
 
-    def self.generate_crontab_entry(output_path, honeycomb_writekey, honeycomb_dataset, start_time, spacing_mins)
+    def self.generate_crontab_entry(output_path, start_time, spacing_mins)
       @cron_time = start_time unless defined?(@cron_time)
       path_to_module = File.join(Dir.pwd, output_path)
       if @initialise_crontab
@@ -667,21 +685,20 @@ module PdkSync
           file.puts 'Copy & paste the following in to the editor when "crontab -e" is invoked from the "iactestrunner" account'
           file.puts "DON'T FORGET TO ADD AN EXTRA NEW LINE AT THE END!"
           file.puts ''
-          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && ./acc.sh)'")
+          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync && ruby clone_managed_modules_https.rb)'")
         end
         @initialise_crontab = false
-      else
-        m, h = @cron_time.split(' ').map(&:to_i)
-        m += spacing_mins.to_i
-        if m >= 60
-          h += 1
-          m = (m - 60)
-        end
-        h = 0 if h == 24
-        @cron_time = "#{m} #{h}"
-        File.open('/tmp/cron_tab', 'a') do |file|
-          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && CI=true HONEYCOMB_WRITEKEY=#{honeycomb_writekey} HONEYCOMB_DATASET=#{honeycomb_dataset} ./acc.sh)'")
-        end
+      end
+      m, h = @cron_time.split(' ').map(&:to_i)
+      m += spacing_mins.to_i
+      if m >= 60
+        h += 1
+        m = (m - 60)
+      end
+      h = 0 if h == 24
+      @cron_time = "#{m} #{h}"
+      File.open('/tmp/cron_tab', 'a') do |file|
+        file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && ./acc.sh; ./teardown.sh)'")
       end
     end
 
