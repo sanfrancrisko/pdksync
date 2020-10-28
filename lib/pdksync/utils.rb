@@ -671,6 +671,7 @@ module PdkSync
         file.puts 'bundle exec rake litmus:acceptance:parallel >> $logFile 2>&1'
         file.puts 'exit 0'
       end
+      `chmod +x #{output_path}/acc.sh`
       generate_teardown_script(output_path)
     end
 
