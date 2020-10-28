@@ -42,6 +42,7 @@
 - puppetlabs-scheduled_task
 - puppetlabs-service
 - puppetlabs-sqlserver
+- puppet-strings
 #- puppetlabs-stdlib
 #- puppetlabs-tagmail
 - puppetlabs-tomcat
