@@ -1202,6 +1202,7 @@ module PdkSync
     # @param [String] puppet_version
     #   Puppet version we are generating platform checks for
     def self.generate_vmpooler_release_checks(module_path, puppet_version)
+      return if module_path.include? 'puppet-strings'
       PdkSync::Logger.info "Generating release checks provision.yaml key for Puppet version #{puppet_version}"
       # This YAML is where the compatible platforms for each Puppet version is stored
       agent_test_platforms_yaml_file_path = 'lib/pdksync/conf/puppet_abs_supported_platforms.yaml'
