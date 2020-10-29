@@ -679,6 +679,7 @@ module PdkSync
       generate_puppet_string_acc_sh(output_path, puppet_collection) if module_name == 'puppet-strings'
       if module_type == 'litmus'
         unless module_name == 'puppet-strings'
+          provision_type = 'release_checks' if module_name.include? 'dsc'
           File.open("#{output_path}/acc.sh", 'w') do |file|
             file.puts '#!/bin/sh'
             file.puts 'set -e'
