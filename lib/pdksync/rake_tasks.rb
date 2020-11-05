@@ -70,6 +70,11 @@ namespace :pdksync do
     PdkSync.main(steps: [:generate_crontab_entry], args: args)
   end
 
+  desc 'Update sync_yml for each module'
+  task :update_sync_yaml do |_task, args|
+    PdkSync.main(steps: [:update_sync_yaml], args: args)
+  end
+
   desc "Fetch run results against modules eg rake 'fetch_test_results_locally[litmus]'"
   task :fetch_test_results_locally do
     PdkSync.main(steps: [:fetch_test_results_locally])

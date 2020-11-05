@@ -43,12 +43,12 @@
 - puppetlabs-service
 - puppetlabs-sqlserver
 - puppet-strings
-#- puppetlabs-stdlib
+- puppetlabs-stdlib
 #- puppetlabs-tagmail
 - puppetlabs-tomcat
 #- puppetlabs-translate
 - puppetlabs-vcsrepo
-#- puppetlabs-vsphere
+- puppetlabs-vsphere
 - puppetlabs-websphere_application_server
 #- puppetlabs-windows
 - puppetlabs-wsus_client

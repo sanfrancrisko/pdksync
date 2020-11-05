@@ -622,6 +622,72 @@ module PdkSync
       sleep 180
     end
 
+    def self.update_sync_yaml(output_path, gem = 'rspec-puppet', git = 'https://github.com/rodjek/rspec-puppet')
+      path_to_sync_yaml = File.join(output_path, '.sync.yml')
+
+      begin
+        sync_yml = YAML.safe_load(File.read(path_to_sync_yaml))
+      rescue
+        PdkSync::Logger.warn("#{path_to_sync_yaml} is an invalid YAML - skipping")
+        return false
+      end
+
+      new_dev_gems = []
+
+      sync_yml['Gemfile']['optional'][':development'].each do |gem_entry|
+        next if
+        if gem_entry['gem'] == 'rspec-puppet'
+          PdkSync::Logger.warn("#{path_to_sync_yaml} contains an entry for rspec-puppet - overwriting")
+          next
+        end
+        new_dev_gems << gem_entry
+      end
+
+      new_dev_gems << { 'gem' => gem, 'git' => git }
+
+      sync_yml['Gemfile']['optional'][':development'] = new_dev_gems
+      File.write(path_to_sync_yaml, YAML.dump(sync_yml))
+    end
+
+    def self.generate_test_runner_script(output_path)
+      File.open("#{output_path}/test_runner.sh", 'w') do |file|
+        file.puts '#!/bin/sh'
+        file.puts 'set -e'
+        file.puts 'set -v'
+        file.puts 'export PATH=$PATH:$HOME/.rbenv/shims'
+        file.puts 'eval "$(rbenv init -)"'
+        file.puts "bash -lc './spec.sh; ./acc.sh; ./teardown.sh'"
+        file.puts 'exit 0'
+      end
+      `chmod +x #{output_path}/test_runner.sh`
+    end
+
+    def self.generate_spec_test_script(output_path)
+      File.open("#{output_path}/spec.sh", 'w') do |file|
+        file.puts '#!/bin/sh'
+        file.puts 'set -e'
+        file.puts 'set -v'
+        file.puts 'export CI=true'
+        file.puts 'export GITHUB_ACTIONS=true'
+        file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+        file.puts 'export GITHUB_RUN_ID=cron'
+        file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+        file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+        file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
+        file.puts 'rm -rf Gemfile.lock'
+        file.puts 'rm -rf .bundle'
+        file.puts 'currentDate=$(date +"%Y_%m_%d")'
+        file.puts 'mkdir -p .logs/${currentDate}'
+        file.puts 'currentTime=$(date +"%H_%M")'
+        file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_spec.log"'
+        file.puts 'echo "Logging to $logFile"'
+        file.puts 'bundle install --path .bundle >> $logFile 2>&1'
+        file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle exec rake parallel_spec'
+        file.puts 'exit 0'
+      end
+      `chmod +x #{output_path}/spec.sh`
+    end
+
     def self.generate_teardown_script(output_path)
       File.open("#{output_path}/teardown.sh", 'w') do |file|
         file.puts '#!/bin/sh'
@@ -707,6 +773,8 @@ module PdkSync
           end
           `chmod +x #{output_path}/acc.sh`
           generate_teardown_script(output_path)
+          generate_spec_test_script(output_path)
+          generate_test_runner_script(output_path)
         end
       else
         PdkSync::Logger.warn "Skipping #{module_name} as it is not a Litmus compatible module"
@@ -724,10 +792,16 @@ module PdkSync
           file.puts 'Copy & paste the following in to the editor when "crontab -e" is invoked from the "iactestrunner" account'
           file.puts "DON'T FORGET TO ADD AN EXTRA NEW LINE AT THE END!"
           file.puts ''
-          file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync && ruby clone_managed_modules_https.rb && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_vmpooler_release_checks[7]\" && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_test_script\")'")
+          file.puts ("0 0 * * * bash -c '(cd /home/iactestrunner/pdksync && ./initialize.sh)'")
+          # file.puts("0 0 * * * bash -c '(export PATH=/opt/rbenv/shims:/opt/rbenv/bin:/usr/bin:$PATH; eval \"$(rbenv init -)\"; cd /home/iactestrunner/pdksync && ruby clone_managed_modules_https.rb && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_vmpooler_release_checks[7]\" && GITHUB_TOKEN=blah bundle exec rake \"pdksync:generate_test_script\")'")
         end
         @initialise_crontab = false
       end
+
+      File.open('/tmp/cron_tab', 'a') do |file|
+        file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && ./test_runner.sh)'")
+      end
+
       m, h = @cron_time.split(' ').map(&:to_i)
       m += spacing_mins.to_i
       if m >= 60
@@ -736,9 +810,6 @@ module PdkSync
       end
       h = 0 if h == 24
       @cron_time = "#{m} #{h}"
-      File.open('/tmp/cron_tab', 'a') do |file|
-        file.puts("#{@cron_time} * * * bash -c '(cd /home/iactestrunner/pdksync/modules_pdksync/#{output_path.split('/')[-1]} && ./acc.sh; ./teardown.sh)'")
-      end
     end
 
     # @summary

@@ -218,6 +218,9 @@ module PdkSync
         if steps.include?(:generate_crontab_entry)
           Utils.generate_crontab_entry(output_path, module_args[:start_time], module_args[:spacing_mins])
         end
+        if steps.include?(:update_sync_yaml)
+          Utils.update_sync_yaml(output_path)
+        end
         if steps.include?(:fetch_test_results_locally)
           Dir.chdir(main_path) unless Dir.pwd == main_path
           PdkSync::Logger.info 'Fetch test results for local run '

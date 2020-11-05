@@ -21,4 +21,10 @@ managed_modules.each do |puppet_module|
   git_clone_cmd = "git clone https://github.com/puppetlabs/#{puppet_module} #{puppet_module_path}"
   log("Running #{git_clone_cmd}")
   `#{git_clone_cmd}`
+
 end
+
+git_clone_cmd = "rm -rf puppet && git clone https://github.com/puppetlabs/puppet"
+log("Running #{git_clone_cmd}")
+`#{git_clone_cmd}`
+`sed -i '' 's/version = "7.0.0"/version = "6.99.9"/' puppet/.gemspec`
