@@ -27,4 +27,4 @@ end
 git_clone_cmd = "rm -rf puppet && git clone https://github.com/puppetlabs/puppet"
 log("Running #{git_clone_cmd}")
 `#{git_clone_cmd}`
-`sed -i '' 's/version = "7.0.0"/version = "6.99.9"/' puppet/.gemspec`
+`sed -i 's/version = "7.0.0"/version = "6.99.9"/' puppet/.gemspec`
