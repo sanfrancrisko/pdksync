@@ -656,7 +656,6 @@ module PdkSync
         file.puts 'set -v'
         file.puts 'export PATH=$PATH:$HOME/.rbenv/shims'
         file.puts 'eval "$(rbenv init -)"'
-        file.puts 'export PUPPET_GEM_VERSION=file://../../puppet'
         file.puts 'export CI=true'
         file.puts 'export GITHUB_ACTIONS=true'
         file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
@@ -682,8 +681,8 @@ module PdkSync
         file.puts 'currentTime=$(date +"%H_%M")'
         file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_spec.log"'
         file.puts 'echo "Logging to $logFile"'
-        file.puts 'bundle install --path .bundle >> $logFile 2>&1'
-        file.puts 'bundle exec rake parallel_spec >> $logFile 2>&1'
+        file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle install --path .bundle >> $logFile 2>&1'
+        file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle exec rake parallel_spec >> $logFile 2>&1'
         file.puts 'exit 0'
       end
       `chmod +x #{output_path}/spec.sh`
