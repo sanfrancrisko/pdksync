@@ -683,7 +683,7 @@ module PdkSync
         file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_spec.log"'
         file.puts 'echo "Logging to $logFile"'
         file.puts 'bundle install --path .bundle >> $logFile 2>&1'
-        file.puts 'bundle exec rake parallel_spec'
+        file.puts 'bundle exec rake parallel_spec >> $logFile 2>&1'
         file.puts 'exit 0'
       end
       `chmod +x #{output_path}/spec.sh`
@@ -737,13 +737,6 @@ module PdkSync
             file.puts '#!/bin/sh'
             file.puts 'set -e'
             file.puts 'set -v'
-            file.puts 'export CI=true'
-            file.puts 'export GITHUB_ACTIONS=true'
-            file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
-            file.puts 'export GITHUB_RUN_ID=cron'
-            file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
-            file.puts 'export HONEYCOMB_DATASET=ag7rb27'
-            file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
             file.puts 'rm -rf Gemfile.lock'
             file.puts 'rm -rf .bundle'
             file.puts 'currentDate=$(date +"%Y_%m_%d")'
