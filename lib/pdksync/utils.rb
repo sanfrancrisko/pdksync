@@ -669,30 +669,39 @@ module PdkSync
       `chmod +x #{output_path}/test_runner.sh`
     end
 
-    def self.generate_spec_test_script(output_path)
-      File.open("#{output_path}/spec.sh", 'w') do |file|
-        file.puts '#!/bin/sh'
-        file.puts 'set -e'
-        file.puts 'set -v'
-        file.puts 'rm -rf Gemfile.lock'
-        file.puts 'rm -rf .bundle'
-        file.puts 'currentDate=$(date +"%Y_%m_%d")'
-        file.puts 'mkdir -p .logs/${currentDate}'
-        file.puts 'currentTime=$(date +"%H_%M")'
-        file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_spec.log"'
-        file.puts 'echo "Logging to $logFile"'
-        file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle install --path .bundle >> $logFile 2>&1'
-        file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle exec rake parallel_spec >> $logFile 2>&1'
-        file.puts 'exit 0'
-      end
-      `chmod +x #{output_path}/spec.sh`
-    end
+    # def self.generate_spec_test_script(output_path)
+    #   File.open("#{output_path}/spec.sh", 'w') do |file|
+    #     file.puts '#!/bin/sh'
+    #     file.puts 'set -e'
+    #     file.puts 'set -v'
+    #     file.puts 'rm -rf Gemfile.lock'
+    #     file.puts 'rm -rf .bundle'
+    #     file.puts 'currentDate=$(date +"%Y_%m_%d")'
+    #     file.puts 'mkdir -p .logs/${currentDate}'
+    #     file.puts 'currentTime=$(date +"%H_%M")'
+    #     file.puts 'logFile=".logs/${currentDate}/$(date --iso=s)_spec.log"'
+    #     file.puts 'echo "Logging to $logFile"'
+    #     file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle install --path .bundle >> $logFile 2>&1'
+    #     file.puts 'PUPPET_GEM_VERSION=file://../../puppet bundle exec rake parallel_spec >> $logFile 2>&1'
+    #     file.puts 'exit 0'
+    #   end
+    #   `chmod +x #{output_path}/spec.sh`
+    # end
 
     def self.generate_teardown_script(output_path)
       File.open("#{output_path}/teardown.sh", 'w') do |file|
         file.puts '#!/bin/sh'
         file.puts 'set -e'
         file.puts 'set -v'
+        file.puts 'export PATH=$PATH:$HOME/.rbenv/shims'
+        file.puts 'eval "$(rbenv init -)"'
+        file.puts 'export CI=true'
+        file.puts 'export GITHUB_ACTIONS=true'
+        file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+        file.puts 'export GITHUB_RUN_ID=cron'
+        file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+        file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+        file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
         file.puts 'currentDate=$(date +"%Y_%m_%d")'
         file.puts 'mkdir -p .logs/${currentDate}'
         file.puts 'currentTime=$(date +"%H_%M")'
@@ -708,6 +717,15 @@ module PdkSync
         file.puts '#!/bin/sh'
         file.puts 'set -e'
         file.puts 'set -v'
+        file.puts 'export PATH=$PATH:$HOME/.rbenv/shims'
+        file.puts 'eval "$(rbenv init -)"'
+        file.puts 'export CI=true'
+        file.puts 'export GITHUB_ACTIONS=true'
+        file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+        file.puts 'export GITHUB_RUN_ID=cron'
+        file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+        file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+        file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
         file.puts 'rm -rf Gemfile.lock'
         file.puts 'rm -rf .bundle'
         file.puts 'currentDate=$(date +"%Y_%m_%d")'
@@ -736,6 +754,15 @@ module PdkSync
             file.puts '#!/bin/sh'
             file.puts 'set -e'
             file.puts 'set -v'
+            file.puts 'export PATH=$PATH:$HOME/.rbenv/shims'
+            file.puts 'eval "$(rbenv init -)"'
+            file.puts 'export CI=true'
+            file.puts 'export GITHUB_ACTIONS=true'
+            file.puts 'export GITHUB_REPOSITORY=$(basename $(git rev-parse --show-toplevel))'
+            file.puts 'export GITHUB_RUN_ID=cron'
+            file.puts 'export GITHUB_SHA=$(git rev-parse HEAD)'
+            file.puts 'export HONEYCOMB_DATASET=ag7rb27'
+            file.puts 'export HONEYCOMB_WRITEKEY=7f3c63a70eecc61d635917de46bea4e6'
             file.puts 'rm -rf Gemfile.lock'
             file.puts 'rm -rf .bundle'
             file.puts 'currentDate=$(date +"%Y_%m_%d")'
