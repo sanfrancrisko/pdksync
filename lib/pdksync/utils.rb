@@ -635,7 +635,6 @@ module PdkSync
       new_dev_gems = []
 
       sync_yml['Gemfile']['optional'][':development'].each do |gem_entry|
-        next if
         if gem_entry['gem'] == 'rspec-puppet'
           PdkSync::Logger.warn("#{path_to_sync_yaml} contains an entry for rspec-puppet - overwriting")
           next
